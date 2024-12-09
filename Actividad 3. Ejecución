@@ -1,0 +1,176 @@
+int main() {
+    SQLHENV hEnv;
+    SQLHDBC hDbc;
+    SQLHSTMT hStmt;
+    SQLRETURN ret;
+
+    // Asignar un gestor de entorno
+    ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &hEnv);
+    if (ret != SQL_SUCCESS) {
+        cerr << "Error al asignar el gestor de entorno." << endl;
+        return -1;
+    }
+    ret = SQLSetEnvAttr(hEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
+    if (ret != SQL_SUCCESS) {
+        cerr << "Error al establecer atributos del entorno." << endl;
+        SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
+        return -1;
+    }
+
+    // Asignar un gestor de conexión
+    ret = SQLAllocHandle(SQL_HANDLE_DBC, hEnv, &hDbc);
+    if (ret != SQL_SUCCESS) {
+        cerr << "Error al asignar el gestor de conexión." << endl;
+        SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
+        return -1;
+    }
+
+    // Conectarse a la base de datos
+    ret = SQLConnect(hDbc,
+        (SQLWCHAR*)L"SQLserver", SQL_NTS,
+        (SQLWCHAR*)L"Username", SQL_NTS,
+        (SQLWCHAR*)L"Password", SQL_NTS);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        cerr << "Error al conectar a la base de datos." << endl;
+        SQLFreeHandle(SQL_HANDLE_DBC, hDbc);
+        SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
+        return -1;
+    }
+    cout << "Conectado a la base de datos exitosamente." << endl;
+
+    // Consulta 1: Obtener datos de Centro_Trabajo
+    ret = SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &hStmt);
+    ret = SQLExecDirect(hStmt, (SQLWCHAR*)L"SELECT ID_Centro, Nombre_Centro, Ciudad FROM Centro_Trabajo", SQL_NTS);
+    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
+        // Encabezado de la tabla Centro_Trabajo
+        wcout << L"+-------------------+------------------------------+------------------+" << endl;
+        wcout << L"| ID_Centro         | Nombre_Centro                | Ciudad           |" << endl;
+        wcout << L"+-------------------+------------------------------+------------------+" << endl;
+
+        SQLINTEGER idCentro;
+        SQLWCHAR nombreCentro[60];
+        SQLWCHAR ciudad[60];
+
+        // Obtener y mostrar los resultados
+        while (SQLFetch(hStmt) == SQL_SUCCESS) {
+            SQLGetData(hStmt, 1, SQL_C_LONG, &idCentro, 0, NULL);
+            SQLGetData(hStmt, 2, SQL_C_WCHAR, nombreCentro, sizeof(nombreCentro), NULL);
+            SQLGetData(hStmt, 3, SQL_C_WCHAR, ciudad, sizeof(ciudad), NULL);
+
+            // Imprimir los datos formateados
+            wcout << L"| " << setw(17) << idCentro
+                << L" | " << setw(28) << nombreCentro
+                << L" | " << setw(16) << ciudad << L" |" << endl;
+        }
+        wcout << L"+-------------------+------------------------------+------------------+" << endl;
+    }
+    else {
+        cout << "Error al ejecutar la consulta de Centro_Trabajo." << endl;
+    }
+
+    // Liberar el manejador de sentencias
+    SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
+
+    // Consulta 2: Obtener datos de Empleado
+    ret = SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &hStmt);
+    ret = SQLExecDirect(hStmt, (SQLWCHAR*)L"SELECT ID_Empleado, Nombre, Apellido_Paterno, Apellido_Materno, Fecha_Nacimiento, RFC, ID_Centro, Puesto, Descripcion_Puesto, Directivo FROM Empleado", SQL_NTS);
+    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
+        // Encabezado de la tabla Empleado
+        wcout << L"+---------------+-----------+--------------------+--------------------+------------------+-------------+------------+---------------------------+------------------------------------------------------+-------------+" << endl;
+        wcout << L"| ID_Empleado   | Nombre    | Apellido_Paterno   | Apellido_Materno   | Fecha_Nacimiento | RFC         | ID_Centro  | Puesto                    | Descripcion_Puesto                                   | Directivo   |" << endl;
+        wcout << L"+---------------+-----------+--------------------+--------------------+------------------+-------------+------------+---------------------------+------------------------------------------------------+-------------+" << endl;
+
+        SQLINTEGER idEmpleado, idCentro, directivo;
+        SQLWCHAR nombre[60], apellidoPaterno[60], apellidoMaterno[60], fechaNacimiento[20], rfc[20], puesto[30], descripcionPuesto[60];
+        char directivoStr[4];  // Usamos un array de char para almacenar "Sí" o "No"
+
+        // Obtener y mostrar resultados
+        while (SQLFetch(hStmt) == SQL_SUCCESS) {
+            SQLGetData(hStmt, 1, SQL_C_LONG, &idEmpleado, 0, NULL);
+            SQLGetData(hStmt, 2, SQL_C_WCHAR, nombre, sizeof(nombre), NULL);
+            SQLGetData(hStmt, 3, SQL_C_WCHAR, apellidoPaterno, sizeof(apellidoPaterno), NULL);
+            SQLGetData(hStmt, 4, SQL_C_WCHAR, apellidoMaterno, sizeof(apellidoMaterno), NULL);
+            SQLGetData(hStmt, 5, SQL_C_WCHAR, fechaNacimiento, sizeof(fechaNacimiento), NULL);
+            SQLGetData(hStmt, 6, SQL_C_WCHAR, rfc, sizeof(rfc), NULL);
+            SQLGetData(hStmt, 7, SQL_C_LONG, &idCentro, 0, NULL);
+            SQLGetData(hStmt, 8, SQL_C_WCHAR, puesto, sizeof(puesto), NULL);
+            SQLGetData(hStmt, 9, SQL_C_WCHAR, descripcionPuesto, sizeof(descripcionPuesto), NULL);
+            SQLGetData(hStmt, 10, SQL_C_LONG, &directivo, 0, NULL);
+
+            // Asignar "Sí" o "No" dependiendo del valor de directivo (1 o 0)
+            if (directivo == 1) {
+                strcpy_s(directivoStr, sizeof(directivoStr), "Si");
+            }
+            else {
+                strcpy_s(directivoStr, sizeof(directivoStr), "No");
+            }
+
+            // Mostrar los resultados
+            wcout << L"| " << setw(13) << idEmpleado
+                << L" | " << setw(9) << nombre
+                << L" | " << setw(18) << apellidoPaterno
+                << L" | " << setw(18) << apellidoMaterno
+                << L" | " << setw(16) << fechaNacimiento
+                << L" | " << setw(10) << rfc
+                << L" | " << setw(10) << idCentro
+                << L" | " << setw(25) << puesto
+                << L" | " << setw(52) << descripcionPuesto
+                << L" | " << setw(9) << directivoStr << L" |" << endl;
+        }
+        wcout << L"+---------------+-----------+--------------------+--------------------+------------------+-------------+------------+---------------------------+------------------------------------------------------+-------------+" << endl;
+    }
+    else {
+        cout << "Error al ejecutar la consulta de Empleado." << endl;
+    }
+
+    // Liberar el manejador de sentencias
+    SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
+
+    // Consulta 3: Obtener datos de Directivo
+    ret = SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &hStmt);
+    ret = SQLExecDirect(hStmt, (SQLWCHAR*)L"SELECT ID_directivo, Numero_Centro_Supervisado, Prestacion_Combustible FROM Directivo", SQL_NTS);
+    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
+        // Encabezado de la tabla Directivo
+        wcout << L"+------------------+---------------------------------+--------------------------+" << endl;
+        wcout << L"| ID_directivo     | Numero_Centro_Supervisado       | Prestacion_Combustible   |" << endl;
+        wcout << L"+------------------+---------------------------------+--------------------------+" << endl;
+
+        SQLINTEGER idDirectivo, numeroCentroSupervisado;
+        SQLWCHAR prestacionCombustible[60];
+        char prestacionCombustibleStr[4];  // Usamos un array de char para almacenar "Sí" o "No"
+
+        // Obtener y mostrar resultados
+        while (SQLFetch(hStmt) == SQL_SUCCESS) {
+            SQLGetData(hStmt, 1, SQL_C_LONG, &idDirectivo, 0, NULL);
+            SQLGetData(hStmt, 2, SQL_C_LONG, &numeroCentroSupervisado, 0, NULL);
+            SQLGetData(hStmt, 3, SQL_C_WCHAR, prestacionCombustible, sizeof(prestacionCombustible), NULL);
+
+            // Asignar "Sí" o "No" dependiendo del valor de prestacionCombustible
+            if (wcscmp(prestacionCombustible, L"1") == 0) {
+                strcpy_s(prestacionCombustibleStr, sizeof(prestacionCombustibleStr), "Si");
+            }
+            else {
+                strcpy_s(prestacionCombustibleStr, sizeof(prestacionCombustibleStr), "No");
+            }
+
+            // Mostrar los resultados
+            wcout << L"| " << setw(16) << idDirectivo
+                << L" | " << setw(31) << numeroCentroSupervisado
+                << L" | " << setw(24) << prestacionCombustibleStr << L" |" << endl;
+        }
+        wcout << L"+------------------+---------------------------------+--------------------------+" << endl;
+    }
+    else {
+        cout << "Error al ejecutar la consulta de Directivo." << endl;
+    }
+
+    // Liberar el manejador de sentencias
+    SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
+
+    // Desconectar y liberar gestores de entorno
+    SQLDisconnect(hDbc);
+    SQLFreeHandle(SQL_HANDLE_DBC, hDbc);
+    SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
+
+    return 0;
+}
